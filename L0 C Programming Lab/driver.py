@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/opt/homebrew/bin/python3
 
 import subprocess
 import sys
