@@ -143,18 +143,17 @@ NOTES:
  *   Rating: 1
  */
 int bitXor(int x, int y) {
-  return 2;
+    return ~(~x & ~y) & ~(x & y);
 }
-/* 
+
+/*
  * tmin - return minimum two's complement integer 
  *   Legal ops: ! ~ & ^ | + << >>
  *   Max ops: 4
  *   Rating: 1
  */
 int tmin(void) {
-
-  return 2;
-
+    return 1 << 31;
 }
 //2
 /*
@@ -165,9 +164,20 @@ int tmin(void) {
  *   Rating: 1
  */
 int isTmax(int x) {
-  return 2;
+    /*
+     * Tmax = 0111
+     * ~Tmax = 1000, Tmax + 1 = 1000
+     * ^ = 0
+     * !0 = 1
+     *
+     * exclude x == -1
+     * ~-1 = ~1111 = 0000
+     * !!0000 = 0
+     */
+    return !(~x ^ (x + 1)) & !!(~x);
 }
-/* 
+
+/*
  * allOddBits - return 1 if all odd-numbered bits in word set to 1
  *   where bits are numbered from 0 (least significant) to 31 (most significant)
  *   Examples allOddBits(0xFFFFFFFD) = 0, allOddBits(0xAAAAAAAA) = 1
@@ -176,9 +186,19 @@ int isTmax(int x) {
  *   Rating: 2
  */
 int allOddBits(int x) {
-  return 2;
+    /*
+     * 85 = 0101010101
+     * x | c = 11111111111111111111111111111111
+     * ~ = 0
+     * ~0 = 1
+     */
+    int a = 85;
+    int b = a | a << 8;
+    int c = b | b << 16;
+    return !(~(x | c));
 }
-/* 
+
+/*
  * negate - return -x 
  *   Example: negate(1) = -1.
  *   Legal ops: ! ~ & ^ | + << >>
@@ -186,7 +206,10 @@ int allOddBits(int x) {
  *   Rating: 2
  */
 int negate(int x) {
-  return 2;
+    /*
+     * x + ~x = -1
+     */
+    return ~x + 1;
 }
 //3
 /* 
@@ -199,9 +222,22 @@ int negate(int x) {
  *   Rating: 3
  */
 int isAsciiDigit(int x) {
-  return 2;
+    /* 0x30 <= x <= 0x39
+     * 48 <= x <= 57
+     * 9 >= x - 48 >= 0
+     *
+     * 57 -x >= 0
+     */
+    int lower = 48;
+    int a = x + ~lower + 1;
+    int b = a >> 4;
+    int higher = 57;
+    int c = higher + ~x + 1;
+    int d = c >> 31;
+    return !b & !d;
 }
-/* 
+
+/*
  * conditional - same as x ? y : z 
  *   Example: conditional(2,4,5) = 4
  *   Legal ops: ! ~ & ^ | + << >>
@@ -209,9 +245,13 @@ int isAsciiDigit(int x) {
  *   Rating: 3
  */
 int conditional(int x, int y, int z) {
-  return 2;
+    int a = !x;
+    int b = (a + ~0) & y;
+    int c = (~a + 1) & z;
+    return b | c;
 }
-/* 
+
+/*
  * isLessOrEqual - if x <= y  then return 1, else return 0 
  *   Example: isLessOrEqual(4,5) = 1.
  *   Legal ops: ! ~ & ^ | + << >>
@@ -219,7 +259,19 @@ int conditional(int x, int y, int z) {
  *   Rating: 3
  */
 int isLessOrEqual(int x, int y) {
-  return 2;
+    /*
+     *  a < 0, b > 0 => true
+     *  a > 0, b < 0 => false
+     *  minus and check first bit
+     */
+
+    int a = (x >> 31) & 1;
+    int b = (y >> 31) & 1;
+    int ab = a & !b;
+    int ba = (!a) & b;
+    int z = y + ~x + 1;
+    int firstBit = z >> 31;
+    return ab | ((!ba) & (!firstBit));
 }
 //4
 /* 
@@ -231,8 +283,25 @@ int isLessOrEqual(int x, int y) {
  *   Rating: 4 
  */
 int logicalNeg(int x) {
-  return 2;
+    /*
+     * consider 3 cases: negative, 0, positive
+     *
+     *  a = x >> 31; a + 1;
+     *  neg: (1 >> 31) + 1  = 0
+     *  0: (0 >> 31) + 1 = 1
+     *  pos: (0 >> 31) + 1 = 1
+     *
+     *  b = 0 - x; c = b >> 31; c + 1;
+     *  neg: ((0 - neg) >> 31) + 1 = 0 + 1 = 1
+     *  0: ((0 - 0) >> 31) + 1 = 0 + 1 = 1
+     *  pos: ((0 - pos) >> 31) + 1 = 1111 + 1 = 0
+     */
+    int a = x >> 31;
+    int b = 0 + ~x + 1;
+    int c = b >> 31;
+    return (a + 1) & (c + 1);
 }
+
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
  *  Examples: howManyBits(12) = 5
@@ -246,7 +315,44 @@ int logicalNeg(int x) {
  *  Rating: 4
  */
 int howManyBits(int x) {
-  return 0;
+    /*
+     * Only deal with non-negative number
+     * x = (~firstBit & x) | (firstBit & ~x);
+     * x = (~1 & x) | (1 & ~x) if x is negative
+     * x = (~0 & x) | (0 & ~x) if x is non-negative
+     *
+     * like binary search, shift 16 8 4 2 1
+     * shift and check if larger than 0 or not
+     * add numbers of larger than 0 bits
+     */
+    int b16, b8, b4, b2, b1, b0;
+    int shift16, shift8, shift4, shift2, shift1;
+    int firstBit = x >> 31;
+    x = (~firstBit & x) | (firstBit & ~x);
+
+    shift16 = x >> 16;
+    b16 = (!!shift16) << 4;
+    x = x >> b16;
+
+    shift8 = x >> 8;
+    b8 = (!!shift8) << 3;
+    x = x >> b8;
+
+    shift4 = x >> 4;
+    b4 = (!!shift4) << 2;
+    x = x >> b4;
+
+    shift2 = x >> 2;
+    b2 = (!!shift2) << 1;
+    x = x >> b2;
+
+    shift1 = x >> 1;
+    b1 = (!!shift1);
+    x = x >> b1;
+
+    b0 = x;
+
+    return 1 + b0 + b1 + b2 + b4 + b8 + b16;
 }
 //float
 /* 
@@ -261,9 +367,10 @@ int howManyBits(int x) {
  *   Rating: 4
  */
 unsigned floatScale2(unsigned uf) {
-  return 2;
+    return 2;
 }
-/* 
+
+/*
  * floatFloat2Int - Return bit-level equivalent of expression (int) f
  *   for floating point argument f.
  *   Argument is passed as unsigned int, but
@@ -276,9 +383,10 @@ unsigned floatScale2(unsigned uf) {
  *   Rating: 4
  */
 int floatFloat2Int(unsigned uf) {
-  return 2;
+    return 2;
 }
-/* 
+
+/*
  * floatPower2 - Return bit-level equivalent of the expression 2.0^x
  *   (2.0 raised to the power x) for any 32-bit integer x.
  *
