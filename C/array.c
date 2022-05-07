@@ -17,7 +17,7 @@ int sum2(const int *arr, int len) {
     return sum;
 }
 
-void print(long d) {
+void printLD(long d) {
     printf("%ld\n", d);
 }
 
@@ -55,11 +55,11 @@ void array() {
         p4++;
     }
     p();
-    print(p4 - a2);
+    printLD(p4 - a2);
 
-    print(&a2[4] - &a2[0]);
+    printLD(&a2[4] - &a2[0]);
 
     int a3[sizeof a2];
     memcpy(a3, a2, sizeof a2);
-    print(*(a3 + 1));
+    printLD(*(a3 + 1));
 }
