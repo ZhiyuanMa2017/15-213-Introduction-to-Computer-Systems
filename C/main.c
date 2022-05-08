@@ -80,13 +80,69 @@ int howManyBits(int x) {
     return 1 + b0 + b1 + b2 + b4 + b8 + b16;
 }
 
+unsigned floatScale2(unsigned uf) {
+    int fracOne = 0x007FFFFF;
+    int sign = (uf >> 31) & 1;
+    int exp = (uf >> 23) & 255;
+    int frac = uf & fracOne;
+    if (exp == 255) {
+        return uf;
+    } else if (exp == 0) {
+        frac = frac << 1;
+        if (frac > fracOne) {
+            frac = frac & fracOne;
+            exp = (exp + 1) << 23;
+        }
+    } else {
+        exp = (exp + 1) << 23;
+    }
+    return sign << 31 | exp | frac;
+}
+
+int floatFloat2Int(unsigned uf) {
+    int fracOne = 0x007FFFFF;
+    int sign = (uf >> 31) & 1;
+    int exp = (uf >> 23) & 255;
+    int frac = uf & fracOne;
+    int res;
+    if (exp < 127) {
+        return 0;
+    } else if (exp == 0x007FFFFF || exp - 127 > 31) {
+        return 0x80000000u;
+    } else {
+        int E = exp - 127;
+        if (E > 23) {
+            res = frac << (E - 23);
+        } else {
+            res = frac >> (23 - E);
+        }
+        res += 1 << E;
+        if (sign) {
+            return ~res + 1;
+        } else {
+            return res;
+        }
+    }
+}
+
+unsigned floatPower2(int x) {
+    if (x > 127) {
+        return 0x7F800000;
+    } else if (x < -126 - 23) {
+        return 0;
+    } else {
+        if (x > -127) {
+            return (x + 127) << 23;
+        } else {
+            return 1 << (126 + x + 23);
+        }
+    }
+}
+
 int main() {
 //    hello();
 //    array();
 //    string();
 //    memory();
-    int x = -2147483648;
-    int y = 2147483647;
-    int c = y - x;
-    print(howManyBits(x));
+    print(0x7F800000);
 }
