@@ -367,7 +367,27 @@ int howManyBits(int x) {
  *   Rating: 4
  */
 unsigned floatScale2(unsigned uf) {
-    return 2;
+    /*
+     * exp == 11111111: special
+     * exp == 00000000: denormalized, 2*frac and check
+     * 00000000 < exp < 11111111: normalized, 2*exp
+     */
+    int fracOne = 255 << 15 | 255 << 7 | 127;
+    int sign = (uf >> 31) & 1;
+    int exp = (uf >> 23) & 255;
+    int frac = uf & fracOne;
+    if (exp == 255) {
+        return uf;
+    } else if (exp == 0) {
+        frac = frac << 1;
+        if (frac > fracOne) {
+            frac = frac & fracOne;
+            exp = (exp + 1) << 23;
+        }
+    } else {
+        exp = (exp + 1) << 23;
+    }
+    return sign << 31 | exp | frac;
 }
 
 /*
@@ -383,7 +403,38 @@ unsigned floatScale2(unsigned uf) {
  *   Rating: 4
  */
 int floatFloat2Int(unsigned uf) {
-    return 2;
+    /*
+     * exp < 127, res < 1
+     * exp == 11111111, res = infinity, return 0x80000000u
+     * exp -127 > 31, larger than TMax, return 0x80000000u
+     *
+     * E = exp - 127
+     * res = 1.M * 2^E
+     * res = 2^E + frac / (2^23) * (2^E)
+     */
+    int fracOne = 0x007FFFFF;
+    int sign = (uf >> 31) & 1;
+    int exp = (uf >> 23) & 255;
+    int frac = uf & fracOne;
+    int res;
+    if (exp < 127) {
+        return 0;
+    } else if (exp == 0x007FFFFF || exp - 127 > 31) {
+        return 0x80000000u;
+    } else {
+        int E = exp - 127;
+        if (E > 23) {
+            res = frac << (E - 23);
+        } else {
+            res = frac >> (23 - E);
+        }
+        res += 1 << E;
+        if (sign) {
+            return ~res + 1;
+        } else {
+            return res;
+        }
+    }
 }
 
 /*
@@ -400,5 +451,22 @@ int floatFloat2Int(unsigned uf) {
  *   Rating: 4
  */
 unsigned floatPower2(int x) {
-    return 2;
+    /*
+     * E = exp - 127
+     * -126 <= E <= 127
+     * frac length is 23
+     * 2^(-23) * 2^(-126) <= M*2^E <= 2^127
+     *
+     */
+    if (x > 127) {
+        return 0x7F800000;
+    } else if (x < -126 - 23) {
+        return 0;
+    } else {
+        if (x > -127) {
+            return (x + 127) << 23;
+        } else {
+            return 1 << (126 + x + 23);
+        }
+    }
 }
